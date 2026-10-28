@@ -1,0 +1,21 @@
+{
+  "name": "vdownfast",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('src/index.html', 'dist/index.html')\"",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "auth:hash": "node hash-password.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "hono": "^4.6.16"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

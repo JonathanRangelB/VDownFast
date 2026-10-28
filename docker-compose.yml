@@ -1,0 +1,20 @@
+services:
+  vdownfast:
+    build: .
+    container_name: vdownfast
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      PORT: ${PORT:-3000}
+      AUTH_USER: ${AUTH_USER:-}
+      AUTH_PASS_HASH: ${AUTH_PASS_HASH:-}
+      SESSION_DB_PATH: /sessions/sessions.sqlite
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      COOKIES_PATH: ${COOKIES_PATH:-/data/cookies.txt}
+    volumes:
+      - ./data:/data
+      - session-data:/sessions
+    restart: unless-stopped
+
+volumes:
+  session-data:
