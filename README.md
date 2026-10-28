@@ -105,10 +105,11 @@ El script no muestra la contraseña mientras la escribes. Copia el hash que impr
 mkdir -p data
 ```
 
-Después construye y arranca el servicio:
+Después descarga la imagen publicada en GitHub Container Registry y arranca el servicio:
 
 ```sh
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 La aplicación estará disponible en `http://localhost:3000` si se ejecuta en el mismo equipo, o en `http://IP_DEL_SERVIDOR:3000` si está en un VPS. El puerto puede modificarse mediante `PORT` en `.env`.
@@ -120,6 +121,10 @@ docker compose logs -f
 docker compose restart
 docker compose down
 ```
+
+## Publicación de la imagen en GHCR
+
+El workflow `.github/workflows/publish-ghcr.yml` construye y publica la imagen automáticamente en `ghcr.io/jonathanrangelb/vdownfast` con las etiquetas `latest` y `sha-<commit>` cada vez que se hace push a `main`. Usa `GITHUB_TOKEN`; no requiere secretos adicionales. Para que el VPS pueda descargarla sin iniciar sesión, configura la visibilidad del paquete como **Public** en GitHub Packages. Si prefieres mantenerlo privado, inicia sesión en GHCR desde el VPS con una credencial que tenga `read:packages`.
 
 Compose monta `./data` en `/data` para `cookies.txt` y un volumen Docker dedicado en `/sessions` para SQLite. El volumen de sesiones se crea con permisos del usuario `node` y persiste aunque se recree el contenedor; `docker compose down -v` también lo elimina. Los archivos descargados temporalmente se guardan en `/tmp/dl` dentro del contenedor.
 

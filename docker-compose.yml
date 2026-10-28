@@ -1,6 +1,7 @@
 services:
   vdownfast:
-    build: .
+    image: ghcr.io/jonathanrangelb/vdownfast:latest
+    pull_policy: always
     container_name: vdownfast
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
