@@ -88,6 +88,12 @@ class YtDlpFailure extends Error {
   constructor(message: string, readonly stderr: string) { super(message); }
 }
 
+function logYtDlpFailure(error: unknown): void {
+  if (!(error instanceof YtDlpFailure)) return;
+  const diagnostic = error.stderr.replace(/https?:\/\/\S+/gi, '[URL]').trim().slice(0, 4000);
+  console.error(`[yt-dlp] ${diagnostic || error.message}`);
+}
+
 const SCRYPT_OPTIONS = { N: 32_768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const PASSWORD_KEY_LENGTH = 64;
 type PasswordVerifier = { salt: Buffer; hash: Buffer };
@@ -416,7 +422,10 @@ async function resolve(url: string): Promise<ResolveRecord> {
       };
       cache.set(url, record);
       return record;
-    })();
+    })().catch((error) => {
+      logYtDlpFailure(error);
+      throw error;
+    });
     resolving.set(url, task);
   }
   try { return await task; }
@@ -520,6 +529,7 @@ async function downloadToTemp(source: string, fileId: string, option: DownloadOp
   } catch (error) {
     const names = await readdir(DOWNLOAD_DIR).catch(() => []);
     await Promise.all(names.filter((name) => name.startsWith(`${fileId}.`)).map((name) => unlink(path.join(DOWNLOAD_DIR, name)).catch(() => {})));
+    logYtDlpFailure(error);
     throw error;
   }
 }
@@ -896,13 +906,30 @@ setInterval(() => {
   for (const [id, value] of files) if (value.expires <= now) { files.delete(id); void unlink(value.path).catch(() => {}); }
 }, 60_000).unref();
 let updating = false;
+function reportYtDlpVersion(): void {
+  const child = spawn('yt-dlp', ['--version'], { stdio: ['ignore', 'pipe', 'ignore'] });
+  let version = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => { version += chunk; });
+  child.on('close', (code) => {
+    if (code === 0) console.log(`[yt-dlp] Versión activa: ${version.trim()}`);
+    else console.warn('[yt-dlp] No se pudo comprobar la versión activa');
+  });
+  child.on('error', () => console.warn('[yt-dlp] No se pudo comprobar la versión activa'));
+}
 const updateYtDlp = () => {
   if (updating) return;
   updating = true;
+  console.log('[yt-dlp] Buscando una nueva versión estable');
   void processQueue.acquire().then((release) => {
     const child = spawn('yt-dlp', ['-U'], { stdio: 'ignore' });
-    child.on('close', (code) => { release(); updating = false; if (code !== 0) console.warn('[yt-dlp] actualización no disponible'); });
-    child.on('error', () => { release(); updating = false; console.warn('[yt-dlp] actualización no disponible'); });
+    child.on('close', (code) => {
+      release();
+      updating = false;
+      if (code === 0) reportYtDlpVersion();
+      else console.warn('[yt-dlp] No se pudo completar la actualización periódica');
+    });
+    child.on('error', () => { release(); updating = false; console.warn('[yt-dlp] No se pudo completar la actualización periódica'); });
   }).catch(() => { updating = false; });
 };
 setInterval(updateYtDlp, 24 * 60 * 60_000).unref();

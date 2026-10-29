@@ -30,7 +30,7 @@ La estrategia seleccionada determina cómo se entrega el contenido:
 - **Proxy streaming:** el servidor transmite el contenido al navegador y reenvía las solicitudes `Range`. Los enlaces requieren un token asociado a una resolución reciente; además, se bloquean destinos locales o privados para reducir el riesgo de SSRF.
 - **Servidor descarga y sirve:** yt-dlp descarga el archivo temporalmente y el servidor lo entrega como adjunto. El archivo se elimina al terminar la transferencia o durante la limpieza de archivos expirados.
 
-La interfaz mantiene el botón de descarga deshabilitado con un spinner hasta que el backend notifica que terminó la transferencia o se produjo un error. El backend expone `GET /api/downloads/:id/status` para consultar ese estado. Si el contenido necesita combinar pistas, remux a MP4 o incrustar una miniatura, se procesa con yt-dlp y ffmpeg. Cuando hay miniatura, se añade al MP4 como imagen de portada incrustada y se elimina el archivo temporal de imagen. La instalación Docker incluye ffmpeg. En el contenedor, yt-dlp intenta actualizarse al arrancar y luego cada 24 horas.
+La interfaz mantiene el botón de descarga deshabilitado con un spinner hasta que el backend notifica que terminó la transferencia o se produjo un error. El backend expone `GET /api/downloads/:id/status` para consultar ese estado. Si el contenido necesita combinar pistas, remux a MP4 o incrustar una miniatura, se procesa con yt-dlp y ffmpeg. Cuando hay miniatura, se añade al MP4 como imagen de portada incrustada y se elimina el archivo temporal de imagen. La instalación Docker incluye ffmpeg. En el contenedor, yt-dlp se actualiza a la versión estable más reciente al arrancar y luego cada 24 horas. El arranque y las actualizaciones periódicas registran el resultado y la versión activa en los logs; los errores de extracción también quedan registrados sin incluir las URLs procesadas.
 
 El acceso se gestiona con un formulario propio y sesiones persistentes. Las rutas de API y descarga requieren una sesión válida; `/healthz` permanece público para comprobaciones de servicio.
 
@@ -122,6 +122,16 @@ docker compose restart
 docker compose down
 ```
 
+Para comprobar la versión activa de yt-dlp o forzar su actualización a la última versión estable:
+
+```sh
+docker exec vdownfast yt-dlp --version
+docker exec vdownfast yt-dlp -U
+docker compose restart
+```
+
+El contenedor también comprueba las actualizaciones automáticamente cada 24 horas. Si no puede acceder al repositorio oficial, conserva la versión incluida en la imagen y muestra el fallo en los logs.
+
 ## Publicación de la imagen en GHCR
 
 El workflow `.github/workflows/publish-ghcr.yml` construye y publica la imagen automáticamente en `ghcr.io/jonathanrangelb/vdownfast` con las etiquetas `latest` y `sha-<commit>` cada vez que se hace push a `main`. Usa `GITHUB_TOKEN`; no requiere secretos adicionales. Para que el VPS pueda descargarla sin iniciar sesión, configura la visibilidad del paquete como **Public** en GitHub Packages. Si prefieres mantenerlo privado, inicia sesión en GHCR desde el VPS con una credencial que tenga `read:packages`.
@@ -193,5 +203,6 @@ Las rutas principales son `GET /`, `GET /api/auth/session`, `POST /api/auth/logi
 
 - **No abre la página:** comprueba que el contenedor esté activo con `docker compose ps` y revisa `docker compose logs -f`. Abre `http://localhost:3000` o la dirección IP y el puerto correctos; no abras `dist/index.html` directamente.
 - **El contenido no se resuelve:** verifica que el enlace corresponda a un dominio compatible y que el contenido esté disponible. Para contenido privado, comprueba que `data/cookies.txt` esté en formato Netscape y sea legible por el contenedor.
+- **YouTube pide confirmar que no eres un bot:** la plataforma está exigiendo autenticación para la IP del servidor. Exporta cookies de YouTube en formato Netscape, guárdalas como `data/cookies.txt` y reinicia el servicio. Actualizar yt-dlp no sustituye esta autenticación. Las cookies son credenciales sensibles y pueden caducar o rotar; no las compartas ni las subas al repositorio.
 - **La descarga combinada falla:** confirma que yt-dlp está actualizado y que ffmpeg está disponible. La imagen Docker instala ambos componentes y actualiza yt-dlp automáticamente.
 - **No se detecta el portapapeles:** utiliza HTTPS y concede el permiso del navegador. También puedes pegar el enlace en cualquier parte de la página o usar el formulario.
